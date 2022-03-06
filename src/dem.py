@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import time
 from progress.bar import Bar
 import os
+import pdb
 
 
 class Tile:
@@ -36,11 +37,13 @@ class Tile:
 
         self.training_data.append(self.image)
         self.training_data.append(detrended)
-        [
-            self.training_data.extend(self.radar_sim(image))
+       
+        self.training_data.extend([
+            self.radar_sim(image)
             for image in self.training_data
-        ]
-        [self.training_data.extend(self.augment(img)) for img in self.training_data]
+        ])
+        
+        self.training_data.extend([self.augment(img) for img in self.training_data])
 
     def detrend_raster(self, sigma: int = 1000):
         sigma = sigma / self.resolution
@@ -58,7 +61,9 @@ class Tile:
     def radar_sim(self, image, swath=100, ratio=2):
         swath = int(swath / self.resolution)
         skip = swath * ratio
-        m, n = image.shape
+        
+        m, n = image.shape[0],image.shape[1]
+ 
         tile = np.zeros(image.shape)
         slices = []
         for i in range(0, m, skip):
@@ -76,7 +81,8 @@ class Tile:
         augmented = []
         augmented.append(image[:, ::-1])
         augmented.append(image[::-1, :])
-        augmented.extend([image.T for image in augmented])
+        transposed = [image.T for image in augmented]
+        augmented.extend(transposed)
         return augmented
 
 
@@ -85,14 +91,14 @@ class DEM:
         self,
         dem: np.ndarray,
         labels: np.ndarray = None,
-        resolution: int = None,
+        resolution: int = 10,
         grid=500,
         area: str = None,
     ) -> None:
         self.dem_path = dem
         self.area = area
         self.dem = np.load(dem, allow_pickle=True)
-        self.height, self.width = self.dem.shape
+        self.height, self.width = self.dem.shape[0],self.dem.shape[1]
 
         if labels is not None:
             self.labels = np.load(labels, allow_pickle=True)
@@ -118,7 +124,7 @@ class DEM:
                 tileargs = {
                     "location": np.s_[i : i + self.grid, j : j + self.grid],
                     "image": image,
-                    "label": self.labels[i, j],
+                    "label": self.labels[indi, indj],
                     "area": self.area,
                     "dem_path": self.dem_path,
                 }
@@ -138,8 +144,8 @@ class DEM:
         return tiles
 
     def run(self, path, load=False):
-        if not os.path.isfile(path + ".npy"):
+        if not os.path.isfile(path):
             self.tiles = self.iterate()
             np.save(path, self.tiles)
-        elif os.path.isfile(path + ".npy") and load:
-            self.tiles = np.load(path + "*.npy", allow_pickle=True)
+        elif os.path.isfile(path) and load:
+            self.tiles = np.load(path, allow_pickle=True)

@@ -1,6 +1,7 @@
 # self define
 
-./data
+
+data/
 
 
 # Byte-compiled / optimized / DLL files
