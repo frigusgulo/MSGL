@@ -6,7 +6,24 @@ from torch.utils.data.sampler import SubsetRandomSampler
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-
+import argparse
+import argparse
+import pdb
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torchvision import datasets, transforms
+from torch.optim.lr_scheduler import StepLR
+import pickle
+import os
+from torch.utils.data import Dataset, DataLoader
+from torch.autograd import Variable
+import numpy as np 
+from progress.bar import Bar
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.metrics import confusion_matrix
+from sys import stdout
 # check if CUDA is available
 train_on_gpu = torch.cuda.is_available()
 
@@ -140,3 +157,109 @@ class Dataset(Dataset):
             self.features = scaler.fit_transform(self.features)
         else:
             self.features = scaler.transform(self.features)
+
+def unpickle(path):
+    with open(path,'rb') as file:
+        data = pickle.load(file)
+        file.close()
+    return data
+
+
+def is_valid_file(parser, arg):
+    if not os.path.isfile(arg):
+        parser.error("The file %s does not exist!" % arg)
+    else:
+        return arg
+
+def main():
+    # Training settings
+    parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
+    parser.add_argument('--batch-size', type=int, default=105, metavar='N',
+                        help='input batch size for training (default: 64)')
+    parser.add_argument('--test-batch-size', type=int, default=55, metavar='N',
+                        help='input batch size for testing (default: 1000)')
+    parser.add_argument('--epochs', type=int, default=100, metavar='N',
+                        help='number of epochs to train (default: 14)')
+    parser.add_argument('--lr', type=float, default=1.0e-1, metavar='LR',
+                        help='learning rate (default: 1.0)')
+    parser.add_argument('--gamma', type=float, default=0.7, metavar='M',
+                        help='Learning rate step gamma (default: 0.7)')
+    parser.add_argument('--no-cuda', action='store_true', default=False,
+                        help='disables CUDA training')
+    parser.add_argument('--seed', type=int, default=1, metavar='S',
+                        help='random seed (default: 1)')
+    parser.add_argument('--log-interval', type=int, default=5, metavar='N',
+                        help='how many batches to wait before logging training status')
+    parser.add_argument('--save-model', action='store_true', default=False,
+                        help='For Saving the current Model')
+
+    parser.add_argument('--testset',
+                        help='Path to Pickled test data',
+                        type=lambda x: is_valid_file(parser, x),
+                        dest="testset",
+                        required=True,
+                        metavar="FILE")
+    parser.add_argument('--trainset',
+                        help='Path to Pickled train data',
+                        type=lambda x: is_valid_file(parser, x),
+                        dest="trainset",
+                        required=True,
+                        metavar="FILE")
+
+    args = parser.parse_args()
+    use_cuda = not args.no_cuda and torch.cuda.is_available()
+
+    torch.manual_seed(args.seed)
+
+    device = torch.device("cuda" if use_cuda else "cpu")
+
+    kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
+
+    scaler = StandardScaler()
+    train_data = unpickle(args.trainset) # pickled Dataset
+    train_data.features = scaler.fit_transform(train_data.features)
+
+
+    print("\n\nTraining Data Length: {}\n".format(len(train_data)))
+    train_loader = torch.utils.data.DataLoader(
+        dataset = train_data,
+        batch_size=args.batch_size, 
+        shuffle=True,
+        **kwargs)
+    
+
+    test_data = unpickle(args.testset)
+    test_data.features = scaler.transform(test_data.features)
+    f = test_data.labels
+
+
+
+
+    print("Test Data Length: {}\n".format(len(test_data)))
+    test_loader = torch.utils.data.DataLoader(
+        dataset = test_data, 
+        batch_size=args.test_batch_size, 
+        shuffle=True,
+        **kwargs)
+
+    model = Net(49).to(device)
+ 
+    optimizer = optim.Adam(model.parameters(), lr=3e-3)
+    criterion = torch.nn.BCELoss()
+
+    # scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
+    bar = Bar('Training',max=args.epochs)
+    for epoch in range(1, args.epochs + 1):
+        bar.next()
+        train(args, model, criterion, device, train_loader, optimizer, epoch,args.epochs,verbose=False)
+        test(model,criterion,device,epoch,args.epochs, test_loader)
+        if epoch == args.epochs: bar.finish()
+    
+    
+        
+    if args.save_model:
+        torch.save(model.state_dict(), "/home/fdunbar/Research/surface-stats/msgl_nn.pt")
+
+
+if __name__ == '__main__':
+    main()

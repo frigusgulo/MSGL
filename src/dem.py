@@ -6,7 +6,8 @@ import time
 from progress.bar import Bar
 import os
 import pdb
-
+import pickle
+from joblib import Parallel, delayed
 
 class Tile:
     def __init__(
@@ -18,7 +19,8 @@ class Tile:
         location: np.ndarray = None,
         dem_path: str = None,
         area: str = None,
-    ) -> None:
+        **kwargs
+    ) :
 
         self.label = label
         self.image = image
@@ -46,6 +48,7 @@ class Tile:
         self.training_data.extend([self.augment(img) for img in self.training_data])
 
     def detrend_raster(self, sigma: int = 1000):
+       
         sigma = sigma / self.resolution
         V = self.image.copy()
         V[self.image == self.nodata] = np.nan
@@ -58,23 +61,25 @@ class Tile:
 
         return trend
 
-    def radar_sim(self, image, swath=100, ratio=2):
+    def radar_sim(self, image, swath=100, ratio=3):
         swath = int(swath / self.resolution)
-        skip = swath * ratio
+        skip = int(swath * ratio)
         
         m, n = image.shape[0],image.shape[1]
  
-        tile = np.zeros(image.shape)
+        tile = np.ones(image.shape)*self.nodata
         slices = []
         for i in range(0, m, skip):
             for j in range(0, n, skip):
-                if bool(np.random.binomial(n=1, p=0.5, size=(1, 1))):
-                    slice = np.s_[:, j : (j + swath)]
-                else:
-                    slice = np.s_[i : (i + swath), :]
-                slices.append(slice)
+                if bool(np.random.binomial(n=1, p=0.2, size=(1, 1))):
+                    if bool(np.random.binomial(n=1, p=0.5, size=(1, 1))):
+                        slice = np.s_[:, j : (j + swath)]
+                    else:
+                        slice = np.s_[i : (i + swath), :]
+                    slices.append(slice)
         for slice in slices:
             tile[slice] = image[slice]
+       
         return tile
 
     def augment(self, image):
@@ -129,7 +134,8 @@ class DEM:
                     "dem_path": self.dem_path,
                 }
                 tile = Tile(**tileargs)
-                tile = tile.process()
+                tile.process()
+               
                 tiles.append(tile)
 
                 counter += 1
@@ -146,6 +152,21 @@ class DEM:
     def run(self, path, load=False):
         if not os.path.isfile(path):
             self.tiles = self.iterate()
-            np.save(path, self.tiles)
+           
+            self.to_training_data(path)
+
         elif os.path.isfile(path) and load:
             self.tiles = np.load(path, allow_pickle=True)
+    
+
+    def to_training_data(self,path) -> None:
+        trainset = []
+ 
+        for tile in self.tiles:
+           
+            imgs = [img for img in tile.training_data]
+            labels = [tile.label]*len(imgs)
+            trainset.append((img,label) for img,label in zip(imgs,labels))
+        with open(path,'wb') as file:
+            pickle.dump(trainset,file)
+
