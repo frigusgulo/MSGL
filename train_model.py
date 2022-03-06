@@ -1,6 +1,6 @@
 import numpy as np
 import torch.optim as optim
-from src.cnnmodel import Net, Dataset
+from src.cnnmodel import Net, Dataset, test, train
 import torch.nn as nn
 import torch
 from torchvision import datasets

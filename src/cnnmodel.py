@@ -17,9 +17,9 @@ else:
 
 
 class Net(nn.Module):
-    def __init__(self):
+    def __init__(self, inputsize: tuple):
         super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
+        self.conv1 = nn.Conv2d(inputsize[0], inputsize[1], 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5)
         self.fc1 = nn.Linear(16 * 5 * 5, 120)
