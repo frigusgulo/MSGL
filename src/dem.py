@@ -166,7 +166,7 @@ class DEM:
            
             imgs = [img for img in tile.training_data]
             labels = [tile.label]*len(imgs)
-            trainset.append((img,label) for img,label in zip(imgs,labels))
-        with open(path,'wb') as file:
+            trainset.append([(img,label) for img,label in zip(imgs,labels)])
+        with open(path,'w') as file:
             pickle.dump(trainset,file)
 
